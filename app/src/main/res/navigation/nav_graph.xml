@@ -10,7 +10,6 @@
         android:name="com.groodysoft.lab49challenge.fragment.WelcomeFragment"
         tools:layout="@layout/fragment_welcome">
 
-
         <action
             android:id="@+id/action_WelcomeFragment_to_PlayFragment"
             app:destination="@id/PlayFragment" />

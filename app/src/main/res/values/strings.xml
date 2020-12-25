@@ -1,5 +1,11 @@
 <resources>
     <string name="app_name">Tap To Snap</string>
-
     <string name="welcome_button_text">Let\'s Go!</string>
+    <string name="times_up_spec">Time\'s Up! Game will restart in %d seconds...</string>
+
+    <string-array name="start_prompts">
+        <item>Ready?</item>
+        <item>Set…</item>
+        <item>Go!</item>
+    </string-array>
 </resources>

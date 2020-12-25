@@ -1,14 +1,9 @@
 package com.groodysoft.lab49challenge
 
 import android.app.Activity
-import android.graphics.Typeface
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.widget.Button
-import android.widget.Toast
-import androidx.core.graphics.TypefaceCompat
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
-import com.google.android.material.button.MaterialButton
 import com.groodysoft.lab49challenge.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
