@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Tap To Snap</string>
+
+    <string name="welcome_button_text">Let\'s Go!</string>
 </resources>
