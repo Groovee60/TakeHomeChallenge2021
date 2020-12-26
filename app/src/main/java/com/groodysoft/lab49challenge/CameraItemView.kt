@@ -15,7 +15,17 @@ enum class TileResultState {
     DEFAULT,
     VERIFY,
     SUCCESS,
-    INCORRECT
+    INCORRECT;
+
+    val needsShade: Boolean
+        get() {
+            return this == VERIFY || this == INCORRECT
+        }
+
+    val needsProgress: Boolean
+        get() {
+            return this == VERIFY
+        }
 }
 
 interface CameraItemListener {
@@ -67,7 +77,7 @@ class CameraItemView @JvmOverloads constructor(
         resultState = state
         GlobalScope.launch(Dispatchers.Main) {
             binding.bgFrame.setImageResource(
-                    when (state) {
+                    when (resultState) {
                         TileResultState.DEFAULT -> R.drawable.tile_default
                         TileResultState.VERIFY -> R.drawable.tile_verify
                         TileResultState.SUCCESS -> R.drawable.tile_success
@@ -75,7 +85,8 @@ class CameraItemView @JvmOverloads constructor(
                     }
             )
 
-            binding.progress.isVisible = state == TileResultState.VERIFY
+            binding.shade.isVisible = resultState.needsShade
+            binding.tileProgress.isVisible = resultState.needsProgress
             listener.onResultChanged(index)
         }
     }

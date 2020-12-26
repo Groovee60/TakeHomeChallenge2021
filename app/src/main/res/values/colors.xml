@@ -17,4 +17,6 @@
     <color name="bg_gray">#FF302236</color>
     <color name="bg_gray_dark">#FF271C2B</color>
 
+    <color name="shade">#5000</color>
+
 </resources>
