@@ -30,6 +30,7 @@ class PlayFragment: Fragment(), CameraItemListener {
 
     private val tiles = mutableListOf<CameraItemView>()
 
+    private var gameIsStarted = false
     private var gameIsOver = false
 
     override fun onCreateView(
@@ -73,6 +74,7 @@ class PlayFragment: Fragment(), CameraItemListener {
 
     private lateinit var timer: CountDownTimer
     private fun startGame() {
+        gameIsStarted = true
         updateTimeDisplay(GAME_DURATION_MS)
         timer = object : CountDownTimer(GAME_DURATION_MS + ONE_SECOND_MS, 100) {
             override fun onTick(millisUntilFinished: Long) {
@@ -124,9 +126,11 @@ class PlayFragment: Fragment(), CameraItemListener {
 
     override fun onTapped(index: Int) {
 
-        if (!gameIsOver) {
+        if (gameIsStarted && !gameIsOver) {
             index.tileAtIndex?.let { tile ->
-                handleTileTap(tile)
+                if (!tile.isMatched) {
+                    handleTileTap(tile)
+                }
             }
         }
     }
