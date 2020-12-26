@@ -35,7 +35,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:paddingTop="6dp"
-        android:text="timer tbd"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/timerBackground"
@@ -53,43 +52,33 @@
         android:columnCount="2"
         android:useDefaultMargins="false">
 
-        <ImageView
+        <com.groodysoft.lab49challenge.CameraItemView
+            android:id="@+id/tileA"
             android:layout_width="0dp"
             android:layout_height="@dimen/tile_ht"
             android:layout_columnWeight="1"
-            android:scaleType="fitXY"
-            android:layout_margin="@dimen/tile_spacing_half"
-            android:contentDescription="@null"
-            android:src="@drawable/tile_default"/>
+            android:layout_margin="@dimen/tile_spacing_half" />
 
-        <ImageView
+        <com.groodysoft.lab49challenge.CameraItemView
+            android:id="@+id/tileB"
             android:layout_width="0dp"
             android:layout_height="@dimen/tile_ht"
             android:layout_columnWeight="1"
-            android:scaleType="fitXY"
-            android:layout_margin="@dimen/tile_spacing_half"
-            android:contentDescription="@null"
-            android:src="@drawable/tile_default"/>
+            android:layout_margin="@dimen/tile_spacing_half" />
 
-        <ImageView
+        <com.groodysoft.lab49challenge.CameraItemView
+            android:id="@+id/tileC"
             android:layout_width="0dp"
             android:layout_height="@dimen/tile_ht"
             android:layout_columnWeight="1"
-            android:scaleType="fitXY"
-            android:layout_margin="@dimen/tile_spacing_half"
-            android:contentDescription="@null"
-            android:src="@drawable/tile_default"/>
+            android:layout_margin="@dimen/tile_spacing_half" />
 
-        <ImageView
+        <com.groodysoft.lab49challenge.CameraItemView
+            android:id="@+id/tileD"
             android:layout_width="0dp"
             android:layout_height="@dimen/tile_ht"
             android:layout_columnWeight="1"
-            android:scaleType="fitXY"
-            android:layout_margin="@dimen/tile_spacing_half"
-            android:contentDescription="@null"
-            android:src="@drawable/tile_default"/>
-
-
+            android:layout_margin="@dimen/tile_spacing_half" />
 
     </GridLayout>
 
