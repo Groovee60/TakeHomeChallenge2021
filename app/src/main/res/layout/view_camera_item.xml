@@ -16,17 +16,15 @@
 
     <ImageView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:contentDescription="@null"
-        android:scaleType="centerCrop"
-        android:src="@drawable/corner_mask"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:scaleType="fitXY"
+        android:src="@drawable/tile_mask_top" />
 
     <ImageView
         android:id="@+id/bgFrame"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_constraintTop_toTopOf="parent"
         android:scaleType="fitXY"
         android:contentDescription="@null" />
 
