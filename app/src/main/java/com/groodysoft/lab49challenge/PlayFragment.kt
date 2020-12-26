@@ -4,12 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
 import android.os.CountDownTimer
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.groodysoft.lab49challenge.databinding.FragmentPlayBinding
@@ -21,7 +19,6 @@ import okhttp3.internal.format
 import java.util.*
 
 const val ONE_SECOND_MS = 1000L
-const val RESTART_DELAY_SECS = 5
 const val GAME_DURATION_MS = 120 * ONE_SECOND_MS
 
 class PlayFragment: Fragment(), CameraItemListener {
@@ -104,13 +101,13 @@ class PlayFragment: Fragment(), CameraItemListener {
         val color = if (won) Color.GREEN else Color.RED
         binding.timerBackground.setBackgroundColor(color)
 
-        val resId = if (won) R.string.winner_toast_spec else R.string.loser_toast_spec
-        val message = getString(resId, RESTART_DELAY_SECS)
-
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-        Handler(Looper.getMainLooper()).postDelayed({
+        val builder = AlertDialog.Builder(requireActivity())
+        builder.setTitle(R.string.game_over)
+        builder.setMessage(if (won) R.string.winner_message else R.string.loser_message)
+        builder.setPositiveButton(android.R.string.ok) { _, _ ->
             requireActivity().onBackPressed()
-        }, RESTART_DELAY_SECS * ONE_SECOND_MS)
+        }
+        builder.show()
     }
 
     private val Int.tileAtIndex: CameraItemView?

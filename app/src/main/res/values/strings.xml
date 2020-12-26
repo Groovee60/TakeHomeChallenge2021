@@ -1,8 +1,9 @@
 <resources>
     <string name="app_name">Tap To Snap</string>
     <string name="welcome_button_text">Let\'s Go!</string>
-    <string name="loser_toast_spec">Time\'s up - You Lose! Game will restart in %d seconds…</string>
-    <string name="winner_toast_spec">Congratulations - You Win! Game will restart in %d seconds…</string>
+    <string name="game_over">Game Over</string>
+    <string name="loser_message">Time\'s up - You Lose! Press OK to play again.</string>
+    <string name="winner_message">Congratulations - You Win! Press OK to play again.</string>
 
     <string-array name="start_prompts">
         <item>Ready?</item>
