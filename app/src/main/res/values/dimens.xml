@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <dimen name="margin_view">16dp</dimen>
-
-    <dimen name="tile_ht">200dp</dimen>
-    <dimen name="tile_spacing_half">12dp</dimen>
+    <item name="tile_aspect_ratio" format="float" type="dimen">.68</item>
 
 </resources>

@@ -26,6 +26,7 @@
         android:id="@+id/bgFrame"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
         android:scaleType="fitXY"
         android:contentDescription="@null" />
 
@@ -41,7 +42,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         style="@style/WhiteFont.Regular24"
-        android:textAlignment="center"
+        android:gravity="center"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHeight_percent=".21"
