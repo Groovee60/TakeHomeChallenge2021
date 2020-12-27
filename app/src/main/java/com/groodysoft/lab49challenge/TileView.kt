@@ -57,15 +57,18 @@ class TileView @JvmOverloads constructor(
         binding.title.typeface = MainApplication.fontKarlaRegular
     }
 
-    fun configure(index: Int, serverItem: Lab49ServerItem, listener: TileListener) {
+    fun configureItem(index: Int, serverItem: Lab49ServerItem) {
 
         this.index = index
-        this.listener = listener
         item = serverItem
 
         setResultState(TileResultState.DEFAULT)
         binding.title.text = item.name
+    }
 
+    fun configureListener(listener: TileListener) {
+
+        this.listener = listener
         setOnClickListener {
             listener.onTapped(index)
         }
@@ -90,7 +93,12 @@ class TileView @JvmOverloads constructor(
 
             binding.shade.isVisible = resultState.needsShade
             binding.tileProgress.isVisible = resultState.needsProgress
-            listener.onResultChanged(index)
+
+            when (resultState) {
+                TileResultState.SUCCESS, TileResultState.INCORRECT -> listener.onResultChanged(index)
+                else -> {}
+            }
+
         }
     }
 

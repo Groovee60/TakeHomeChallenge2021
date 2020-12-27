@@ -5,11 +5,9 @@
     <string name="loser_message">Time\'s up - You Lose! Press OK to play again.</string>
     <string name="winner_message">Congratulations - You Win! Press OK to play again.</string>
 
-    <string-array name="start_prompts">
-        <item>Ready?</item>
-        <item>Set…</item>
-        <item>Go!</item>
-    </string-array>
+    <string name="ready">Ready?</string>
+    <string name="set">Set…</string>
+    <string name="go">Go!</string>
 
     <string name="title_fatal_error">Fatal Error</string>
     <string name="error_invalid_response">The server did not return the correct number of items.</string>

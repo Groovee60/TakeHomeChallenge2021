@@ -112,30 +112,35 @@ class PlayFragment: Fragment(), TileListener {
         val listType: Type = object : TypeToken<List<Lab49ServerItem?>?>() {}.type
         val items: List<Lab49ServerItem> = MainApplication.gson.fromJson(args.jsonItemArray, listType)
 
+        // option for 4 discrete tiles instead of the overhead of a recycler view and adapter/viewholder pattern
         tiles.add(binding.tileA)
         tiles.add(binding.tileB)
         tiles.add(binding.tileC)
         tiles.add(binding.tileD)
 
         for ((index, tile) in tiles.withIndex()) {
-            tile.configure(index, items[index], this)
+            tile.configureItem(index, items[index])
         }
 
-        val startPrompts = resources.getStringArray(R.array.start_prompts)
-        if (startPrompts.size == 3) {
-            GlobalScope.launch(Dispatchers.Main) {
-                binding.timer.text = startPrompts[0]    // Ready?
-                delay(ONE_SECOND_MS)
-                binding.timer.text = startPrompts[1]    // Set...
-                delay(ONE_SECOND_MS)
-                binding.timer.text = startPrompts[2]    // Go!
-                delay(ONE_SECOND_MS)
-                startGame()
-            }
+        GlobalScope.launch(Dispatchers.Main) {
+            binding.timer.text = getString(R.string.ready)
+            delay(ONE_SECOND_MS)
+            binding.timer.text = getString(R.string.set)
+            delay(ONE_SECOND_MS)
+            binding.timer.text = getString(R.string.go)
+            delay(500)
+            configureListeners()
+            startGame()
         }
 
         binding.shutterButton.setOnClickListener {
             takePhotoWithCameraX()
+        }
+    }
+
+    private fun configureListeners() {
+        for (tile in tiles) {
+            tile.configureListener(this)
         }
     }
 
