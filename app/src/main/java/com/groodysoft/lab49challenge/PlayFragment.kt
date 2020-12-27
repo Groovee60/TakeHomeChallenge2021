@@ -26,6 +26,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.navArgs
+import com.google.gson.reflect.TypeToken
 import com.groodysoft.lab49challenge.databinding.FragmentPlayBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -35,6 +37,7 @@ import okhttp3.internal.format
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.lang.reflect.Type
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.max
@@ -53,9 +56,11 @@ class PlayFragment: Fragment(), CameraItemListener {
         private const val USE_CAMERAX = true
     }
 
+    private val args: PlayFragmentArgs by navArgs()
+
     private lateinit var binding: FragmentPlayBinding
 
-    private val tiles = mutableListOf<CameraItemView>()
+    private val tiles = mutableListOf<ItemTileView>()
     private var currentTileIndex = -1
 
     private var gameIsStarted = false
@@ -99,7 +104,14 @@ class PlayFragment: Fragment(), CameraItemListener {
 
         outputDirectory = getOutputDirectory()
 
-        val items = Lab49Repository.currentItemsToSnap
+        // in a more state-of-the-art implementation, typeface could be specifed in XML
+        binding.title.typeface = MainApplication.fontKarlaBold
+        binding.timer.typeface = MainApplication.fontKarlaRegular
+
+        // current list of server items is passed as a navigation argument
+        val listType: Type = object : TypeToken<List<Lab49ServerItem?>?>() {}.type
+        val items: List<Lab49ServerItem> = MainApplication.gson.fromJson(args.jsonItemArray, listType)
+
         tiles.add(binding.tileA)
         tiles.add(binding.tileB)
         tiles.add(binding.tileC)
@@ -168,7 +180,7 @@ class PlayFragment: Fragment(), CameraItemListener {
         builder.show()
     }
 
-    private val Int.tileAtIndex: CameraItemView?
+    private val Int.tileAtIndex: ItemTileView?
         get() {
             return when (this) {
                 0 -> binding.tileA

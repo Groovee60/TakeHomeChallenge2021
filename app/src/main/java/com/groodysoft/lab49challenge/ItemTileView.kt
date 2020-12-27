@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.util.AttributeSet
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isVisible
-import com.groodysoft.lab49challenge.databinding.ViewCameraItemBinding
+import com.groodysoft.lab49challenge.databinding.ViewItemTileBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -33,14 +33,14 @@ interface CameraItemListener {
     fun onResultChanged(index: Int)
 }
 
-class CameraItemView @JvmOverloads constructor(
+class ItemTileView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyle: Int = 0,
     defStyleRes: Int = 0
 ) : ConstraintLayout(context, attrs, defStyle, defStyleRes) {
 
-    private var binding: ViewCameraItemBinding
+    private var binding: ViewItemTileBinding
 
     lateinit var item: Lab49ServerItem
     private lateinit var resultState: TileResultState
@@ -51,7 +51,10 @@ class CameraItemView @JvmOverloads constructor(
     init {
 
         val activity = context as Activity
-        binding = ViewCameraItemBinding.inflate(activity.layoutInflater, this, true)
+        binding = ViewItemTileBinding.inflate(activity.layoutInflater, this, true)
+
+        // in a more state-of-the-art implementation, typeface could be specifed in XML
+        binding.title.typeface = MainApplication.fontKarlaRegular
     }
 
     fun configure(index: Int, serverItem: Lab49ServerItem, listener: CameraItemListener) {

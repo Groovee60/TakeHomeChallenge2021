@@ -19,6 +19,12 @@
     <fragment
         android:id="@+id/PlayFragment"
         android:name="com.groodysoft.lab49challenge.PlayFragment"
-        tools:layout="@layout/fragment_play"/>
+        tools:layout="@layout/fragment_play" >
+
+        <argument
+            android:name="jsonItemArray"
+            app:argType="string" />
+
+    </fragment>
 
 </navigation>

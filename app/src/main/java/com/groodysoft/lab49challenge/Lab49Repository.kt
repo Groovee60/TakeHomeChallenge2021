@@ -26,8 +26,6 @@ interface Lab49API {
 
 object Lab49Repository {
 
-    lateinit var currentItemsToSnap: List<Lab49ServerItem>
-
     suspend fun getItems() = lab49API.getItems()
 
     suspend fun postItem(payload: ImagePayload) = lab49API.postItem(payload)

@@ -31,22 +31,26 @@ class WelcomeFragment: Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // in a more state-of-the-art implementation, typeface could be specifed in XML
         binding.welcomeButton.typeface = MainApplication.fontKarlaBold
         binding.welcomeButton.setOnClickListener {
 
-            loadDataAndPlay()
+            loadDataAndPlayGame()
         }
     }
 
-    private fun loadDataAndPlay() {
+    private fun loadDataAndPlayGame() {
 
         requireActivity().showProgress()
         GlobalScope.launch(Dispatchers.IO + requireActivity().exceptionHandler) {
 
             val items = Lab49Repository.getItems()
             if (items.size == 4) {
-                Lab49Repository.currentItemsToSnap = items
-                findNavController().navigate(R.id.action_WelcomeFragment_to_PlayFragment)
+
+                val jsonItemArray = MainApplication.gson.toJson(items)
+                val direction = WelcomeFragmentDirections.actionWelcomeFragmentToPlayFragment(jsonItemArray)
+                findNavController().navigate(direction)
+
                 requireActivity().hideProgress()
             } else {
                 requireActivity().showFatalAlert(R.string.error_invalid_response)

@@ -48,7 +48,7 @@
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        style="@style/WhiteFont.Regular24"
+        style="@style/WhiteFont.24"
         android:gravity="center"
         android:paddingBottom="3dp"
         app:layout_constraintHeight_percent=".21"
