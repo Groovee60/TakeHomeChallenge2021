@@ -15,6 +15,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -35,6 +36,10 @@ class MainActivity : AppCompatActivity() {
             binding.progress.layout.isVisible = false
         }
     }
+
+
+
+
 }
 
 fun Activity.showProgress() {

@@ -1,14 +1,28 @@
 package com.groodysoft.lab49challenge
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.groodysoft.lab49challenge.databinding.FragmentPlayBinding
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +30,11 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.internal.format
+import java.io.File
+import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 const val ONE_SECOND_MS = 1000L
 const val GAME_DURATION_MS = 120 * ONE_SECOND_MS
@@ -26,13 +44,34 @@ class PlayFragment: Fragment(), CameraItemListener {
     private lateinit var binding: FragmentPlayBinding
 
     private val tiles = mutableListOf<CameraItemView>()
+    private var currentTileIndex = -1
 
     private var gameIsStarted = false
     private var gameIsOver = false
 
+    private var imageCapture: ImageCapture? = null
+
+    private lateinit var outputDirectory: File
+    private lateinit var cameraExecutor: ExecutorService
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        requireActivity().onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (binding.viewFinder.isVisible) {
+                    hideViewFinder()
+                } else {
+                    isEnabled = false
+                    requireActivity().onBackPressed()
+                }
+            }
+        })
+    }
+
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
+            inflater: LayoutInflater, container: ViewGroup?,
+            savedInstanceState: Bundle?
     ): View {
 
         // change the activity/window status bar color
@@ -44,6 +83,16 @@ class PlayFragment: Fragment(), CameraItemListener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Request camera permissions
+        if (allPermissionsGranted()) {
+            startCamera()
+        } else {
+            ActivityCompat.requestPermissions(
+                    requireActivity(), REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+        }
+
+        outputDirectory = getOutputDirectory()
 
         val items = Lab49Repository.currentItemsToSnap
         tiles.add(binding.tileA)
@@ -66,6 +115,10 @@ class PlayFragment: Fragment(), CameraItemListener {
                 delay(ONE_SECOND_MS)
                 startGame()
             }
+        }
+
+        binding.shutterButton.setOnClickListener {
+            takePhoto()
         }
     }
 
@@ -125,8 +178,9 @@ class PlayFragment: Fragment(), CameraItemListener {
 
         if (gameIsStarted && !gameIsOver) {
             index.tileAtIndex?.let { tile ->
+                currentTileIndex = index
                 if (!tile.isMatched) {
-                    handleTileTap(tile)
+                    showViewFinder()
                 }
             }
         }
@@ -140,21 +194,9 @@ class PlayFragment: Fragment(), CameraItemListener {
         }
     }
 
-    private fun handleTileTap(tile: CameraItemView) {
+    private fun onImageCaptured( bitmap: Bitmap) {
 
-        // launch camera and capture image
-
-        // TODO
-
-        val filename = "images/${tile.item.name.toLowerCase(Locale.US)}.jpg"
-        Utils.getBitmapFromAssets(filename)?.let { bitmap ->
-            onImageCaptured(tile.index, bitmap)
-        }
-    }
-
-    private fun onImageCaptured(index: Int, bitmap: Bitmap) {
-
-        index.tileAtIndex?.let { tile ->
+        currentTileIndex.tileAtIndex?.let { tile ->
 
             tile.setCapturedImage(bitmap)
             tile.setResultState(TileResultState.VERIFY)
@@ -167,13 +209,128 @@ class PlayFragment: Fragment(), CameraItemListener {
                 // get phony image match result
                 val result = Lab49Repository.postItem(payload)
                 tile.setResultState(
-                    when(result.matched) {
-                        true -> TileResultState.SUCCESS
-                        false -> TileResultState.INCORRECT
-                    }
+                        when (result.matched) {
+                            true -> TileResultState.SUCCESS
+                            false -> TileResultState.INCORRECT
+                        }
                 )
             }
         }
+    }
+
+    private fun startCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
+
+        cameraProviderFuture.addListener({
+            // Used to bind the lifecycle of cameras to the lifecycle owner
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+
+            // Preview
+            val preview = Preview.Builder()
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(binding.viewFinder.createSurfaceProvider())
+                    }
+
+            imageCapture = ImageCapture.Builder()
+                    .build()
+
+            // Select back camera as a default
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                // Unbind use cases before rebinding
+                cameraProvider.unbindAll()
+
+                // Bind use cases to camera
+                cameraProvider.bindToLifecycle(
+                        this, cameraSelector, preview, imageCapture)
+
+            } catch (exc: Exception) {
+                Log.e(TAG, "Use case binding failed", exc)
+            }
+
+        }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+    private fun takePhoto() {
+
+        // Get a stable reference of the modifiable image capture use case
+        binding.viewFinder.isVisible = true
+        val imageCapture = imageCapture ?: return
+
+        // Create time-stamped output file to hold the image
+        val photoFile = File(
+                outputDirectory,
+                SimpleDateFormat(FILENAME_FORMAT, Locale.US
+                ).format(System.currentTimeMillis()) + ".jpg")
+
+        // Create output options object which contains file + metadata
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+        // Set up image capture listener, which is triggered after photo has
+        // been taken
+        imageCapture.takePicture(
+                outputOptions, ContextCompat.getMainExecutor(requireContext()), object : ImageCapture.OnImageSavedCallback {
+            override fun onError(exc: ImageCaptureException) {
+                hideViewFinder()
+                val msg = "Photo capture failed: ${exc.message}"
+                Log.e(TAG, msg, exc)
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+            }
+
+            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+
+                val savedUri = Uri.fromFile(photoFile)
+                hideViewFinder()
+                currentTileIndex.tileAtIndex?.let { tile ->
+
+                    val tileWidth = tile.width
+
+                    val rawCapturedBitmap = BitmapFactory.decodeFile(savedUri.getPath())
+                    val resizedBitmap = BitmapScaler.scaleToFitWidth(rawCapturedBitmap, tileWidth)
+                    resizedBitmap.rotate(90f)?.let { rotatedBitmap ->
+
+                        onImageCaptured(rotatedBitmap)
+                    }
+                }
+            }
+        })
+    }
+
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(
+                requireContext(), it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun getOutputDirectory(): File {
+        val mediaDir = requireActivity().externalMediaDirs.firstOrNull()?.let {
+            File(it, resources.getString(R.string.app_name)).apply { mkdirs() } }
+        return if (mediaDir != null && mediaDir.exists())
+            mediaDir else requireActivity().filesDir
+    }
+
+    private fun showViewFinder() {
+
+        binding.viewFinder.isVisible = true
+        binding.shutterButton.isVisible = true
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        startCamera()
+
+    }
+
+    private fun hideViewFinder() {
+
+        binding.viewFinder.isVisible = false
+        binding.shutterButton.isVisible = false
+        cameraExecutor.shutdown()
+    }
+
+    companion object {
+        private const val TAG = "CameraXBasic"
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
 
 }
