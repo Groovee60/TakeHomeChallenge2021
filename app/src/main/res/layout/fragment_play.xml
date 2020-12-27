@@ -121,11 +121,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <Button
+    <ImageButton
         android:id="@+id/shutterButton"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
         android:layout_marginBottom="50dp"
+        android:background="@null"
+        android:src="@drawable/shutter_selector"
+        android:contentDescription="@null"
         android:scaleType="fitCenter"
         android:visibility="gone"
         app:layout_constraintLeft_toLeftOf="parent"

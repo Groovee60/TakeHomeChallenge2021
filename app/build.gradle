@@ -42,14 +42,15 @@ android {
 dependencies {
 
     def appCompatVersion = '1.2.0'
-    def cameraxVersion = "1.0.0-beta07"
-    def cameraViewVersion = "1.0.0-alpha14"
+    def cameraxVersion = "1.0.0-rc01"
+    def cameraViewVersion = "1.0.0-alpha20"
     def constraintLayoutVersion = '2.0.4'
     def coreKtxVersion = '1.3.2'
     def gsonVersion = '2.8.6'
     def interceptorVersion = '4.7.2'
     def materialVersion = '1.2.1'
     def navigationKtxVersion = '2.3.2'
+    def permissionsVersion = '3.8'
     def retrofitVersion = '2.9.0'
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
@@ -63,6 +64,7 @@ dependencies {
     implementation "androidx.navigation:navigation-ui-ktx:$navigationKtxVersion"
     implementation "com.google.android.material:material:$materialVersion"
     implementation "com.google.code.gson:gson:$gsonVersion"
+    implementation "com.nabinbhandari.android:permissions:$permissionsVersion"
     implementation "com.squareup.retrofit2:converter-gson:$retrofitVersion"
     implementation "com.squareup.retrofit2:retrofit:$retrofitVersion"
     implementation "com.squareup.okhttp3:logging-interceptor:$interceptorVersion"

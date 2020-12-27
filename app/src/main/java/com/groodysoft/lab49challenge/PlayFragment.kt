@@ -1,14 +1,16 @@
 package com.groodysoft.lab49challenge
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.CountDownTimer
-import android.util.Log
+import android.os.Environment
+import android.provider.MediaStore
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -20,8 +22,8 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.groodysoft.lab49challenge.databinding.FragmentPlayBinding
@@ -30,16 +32,26 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.internal.format
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
+import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.max
+import kotlin.math.min
 
-const val ONE_SECOND_MS = 1000L
-const val GAME_DURATION_MS = 120 * ONE_SECOND_MS
+// Camera permissions are enforced in MainActivity before we can get to this fragment
+// App does not currently support permissions being maliciously denied after that point
 
 class PlayFragment: Fragment(), CameraItemListener {
+
+    companion object {
+        private const val ONE_SECOND_MS = 1000L
+        private const val GAME_DURATION_MS = 120 * ONE_SECOND_MS
+        private const val REQUEST_IMAGE_CAPTURE = 1
+
+        private const val USE_CAMERAX = true
+    }
 
     private lateinit var binding: FragmentPlayBinding
 
@@ -50,6 +62,7 @@ class PlayFragment: Fragment(), CameraItemListener {
     private var gameIsOver = false
 
     private var imageCapture: ImageCapture? = null
+    lateinit var capturedRawImagePath: String
 
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
@@ -60,7 +73,7 @@ class PlayFragment: Fragment(), CameraItemListener {
         requireActivity().onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (binding.viewFinder.isVisible) {
-                    hideViewFinder()
+                    hideCameraX()
                 } else {
                     isEnabled = false
                     requireActivity().onBackPressed()
@@ -83,14 +96,6 @@ class PlayFragment: Fragment(), CameraItemListener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        // Request camera permissions
-        if (allPermissionsGranted()) {
-            startCamera()
-        } else {
-            ActivityCompat.requestPermissions(
-                    requireActivity(), REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
-        }
 
         outputDirectory = getOutputDirectory()
 
@@ -118,7 +123,7 @@ class PlayFragment: Fragment(), CameraItemListener {
         }
 
         binding.shutterButton.setOnClickListener {
-            takePhoto()
+            takePhotoWithCameraX()
         }
     }
 
@@ -180,7 +185,12 @@ class PlayFragment: Fragment(), CameraItemListener {
             index.tileAtIndex?.let { tile ->
                 currentTileIndex = index
                 if (!tile.isMatched) {
-                    showViewFinder()
+
+                    if (USE_CAMERAX) {
+                        showCameraX()
+                    } else {
+                        dispatchTakePictureIntent()
+                    }
                 }
             }
         }
@@ -194,31 +204,37 @@ class PlayFragment: Fragment(), CameraItemListener {
         }
     }
 
-    private fun onImageCaptured( bitmap: Bitmap) {
+    private fun handleFinalBitmap(bitmap: Bitmap) {
 
         currentTileIndex.tileAtIndex?.let { tile ->
 
+            // display bitmap in verifying state
             tile.setCapturedImage(bitmap)
             tile.setResultState(TileResultState.VERIFY)
 
-            // send image to server
-            val payload = ImagePayload(tile.item.name, "junkfdjsklfewio")
+            // encode image
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
+            val base64Encoding = Base64.encodeToString(byteArray, Base64.DEFAULT)
 
+            // send image to server
+            val payload = ImagePayload(tile.item.name, base64Encoding)
             GlobalScope.launch(Dispatchers.IO + requireActivity().exceptionHandler) {
 
                 // get phony image match result
                 val result = Lab49Repository.postItem(payload)
                 tile.setResultState(
-                        when (result.matched) {
-                            true -> TileResultState.SUCCESS
-                            false -> TileResultState.INCORRECT
-                        }
+                    when (result.matched) {
+                        true -> TileResultState.SUCCESS
+                        false -> TileResultState.INCORRECT
+                    }
                 )
             }
         }
     }
 
-    private fun startCamera() {
+    private fun startCameraX() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
 
         cameraProviderFuture.addListener({
@@ -229,7 +245,7 @@ class PlayFragment: Fragment(), CameraItemListener {
             val preview = Preview.Builder()
                     .build()
                     .also {
-                        it.setSurfaceProvider(binding.viewFinder.createSurfaceProvider())
+                        it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                     }
 
             imageCapture = ImageCapture.Builder()
@@ -247,23 +263,20 @@ class PlayFragment: Fragment(), CameraItemListener {
                         this, cameraSelector, preview, imageCapture)
 
             } catch (exc: Exception) {
-                Log.e(TAG, "Use case binding failed", exc)
+                requireActivity().showFatalAlert(R.string.error_starting_camera)
             }
 
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
-    private fun takePhoto() {
+    private fun takePhotoWithCameraX() {
 
         // Get a stable reference of the modifiable image capture use case
         binding.viewFinder.isVisible = true
         val imageCapture = imageCapture ?: return
 
         // Create time-stamped output file to hold the image
-        val photoFile = File(
-                outputDirectory,
-                SimpleDateFormat(FILENAME_FORMAT, Locale.US
-                ).format(System.currentTimeMillis()) + ".jpg")
+        val photoFile = File(outputDirectory, "temp.jpg")
 
         // Create output options object which contains file + metadata
         val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
@@ -273,34 +286,22 @@ class PlayFragment: Fragment(), CameraItemListener {
         imageCapture.takePicture(
                 outputOptions, ContextCompat.getMainExecutor(requireContext()), object : ImageCapture.OnImageSavedCallback {
             override fun onError(exc: ImageCaptureException) {
-                hideViewFinder()
-                val msg = "Photo capture failed: ${exc.message}"
-                Log.e(TAG, msg, exc)
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+                hideCameraX()
+                Toast.makeText(requireContext(), R.string.error_taking_photo, Toast.LENGTH_LONG).show()
             }
 
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
 
+                hideCameraX()
                 val savedUri = Uri.fromFile(photoFile)
-                hideViewFinder()
-                currentTileIndex.tileAtIndex?.let { tile ->
-
-                    val tileWidth = tile.width
-
-                    val rawCapturedBitmap = BitmapFactory.decodeFile(savedUri.getPath())
-                    val resizedBitmap = BitmapScaler.scaleToFitWidth(rawCapturedBitmap, tileWidth)
-                    resizedBitmap.rotate(90f)?.let { rotatedBitmap ->
-
-                        onImageCaptured(rotatedBitmap)
-                    }
+                savedUri.path?.let {
+                    capturedRawImagePath = it
+                    processCapturedBitmap()
+                } ?: run {
+                    requireActivity().showFatalAlert(R.string.error_saving_image)
                 }
             }
         })
-    }
-
-    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(
-                requireContext(), it) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun getOutputDirectory(): File {
@@ -310,27 +311,89 @@ class PlayFragment: Fragment(), CameraItemListener {
             mediaDir else requireActivity().filesDir
     }
 
-    private fun showViewFinder() {
+    private fun showCameraX() {
 
         binding.viewFinder.isVisible = true
         binding.shutterButton.isVisible = true
         cameraExecutor = Executors.newSingleThreadExecutor()
-        startCamera()
+        startCameraX()
 
     }
 
-    private fun hideViewFinder() {
+    private fun hideCameraX() {
 
         binding.viewFinder.isVisible = false
         binding.shutterButton.isVisible = false
         cameraExecutor.shutdown()
     }
 
-    companion object {
-        private const val TAG = "CameraXBasic"
-        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+    private fun dispatchTakePictureIntent() {
+
+        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        try {
+            takePictureIntent.resolveActivity(requireActivity().packageManager).also {
+
+                val photoFile: File? = try {
+                    createImageFile()
+                } catch (ex: IOException) {
+                    requireActivity().showFatalAlert(R.string.error_saving_image)
+                    null
+                }
+                photoFile?.also {
+                    val photoURI: Uri = FileProvider.getUriForFile(
+                            requireContext(),
+                            "com.groodysoft.lab49challenge.file.provider",
+                            it
+                    )
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
+                }
+            }
+        } catch (e: ActivityNotFoundException) {
+            requireActivity().showFatalAlert(R.string.error_no_camera_app)
+        } catch (e: SecurityException) {
+            requireActivity().showFatalAlert(R.string.error_no_camera_permisisons)
+        }
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == REQUEST_IMAGE_CAPTURE) {
+            processCapturedBitmap()
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun createImageFile(): File {
+        val storageDir: File? = requireActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile("temp_", ".jpg", storageDir).apply {
+            capturedRawImagePath = absolutePath
+        }
+    }
+
+    private fun processCapturedBitmap() {
+
+        currentTileIndex.tileAtIndex?.let { tile ->
+
+            BitmapFactory.Options().apply {
+
+                // decode just to get the dimensions
+                inJustDecodeBounds = true
+                BitmapFactory.decodeFile(capturedRawImagePath, this)
+                inJustDecodeBounds = false
+                // reverse the width and height because it's landscape view instead of the portrait we want
+                inSampleSize = max(1, min(outWidth / tile.imageHeight, outHeight / tile.imageWidth))
+
+                // decode to resample
+                BitmapFactory.decodeFile(capturedRawImagePath, this)?.also { resizedBitmap ->
+
+                    // rotate
+                    resizedBitmap.rotate(90f)?.let { rotatedBitmap ->
+                        handleFinalBitmap(rotatedBitmap)
+                    }
+                }
+            }
+        }
+    }
 }

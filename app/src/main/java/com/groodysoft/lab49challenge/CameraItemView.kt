@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.AttributeSet
+import android.util.Log
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isVisible
 import com.groodysoft.lab49challenge.databinding.ViewCameraItemBinding
@@ -96,4 +97,13 @@ class CameraItemView @JvmOverloads constructor(
             return resultState == TileResultState.SUCCESS
         }
 
+    val imageWidth: Int
+        get() {
+            return binding.capturedImage.width
+        }
+
+    val imageHeight: Int
+        get() {
+            return binding.capturedImage.height
+        }
 }
