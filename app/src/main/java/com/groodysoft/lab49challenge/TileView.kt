@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.util.AttributeSet
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isVisible
-import com.groodysoft.lab49challenge.databinding.ViewItemTileBinding
+import com.groodysoft.lab49challenge.databinding.ViewTileBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -28,36 +28,36 @@ enum class TileResultState {
         }
 }
 
-interface CameraItemListener {
+interface TileListener {
     fun onTapped(index: Int)
     fun onResultChanged(index: Int)
 }
 
-class ItemTileView @JvmOverloads constructor(
+class TileView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyle: Int = 0,
     defStyleRes: Int = 0
 ) : ConstraintLayout(context, attrs, defStyle, defStyleRes) {
 
-    private var binding: ViewItemTileBinding
+    private var binding: ViewTileBinding
 
     lateinit var item: Lab49ServerItem
     private lateinit var resultState: TileResultState
     private var index: Int = -1
 
-    private lateinit var listener: CameraItemListener
+    private lateinit var listener: TileListener
 
     init {
 
         val activity = context as Activity
-        binding = ViewItemTileBinding.inflate(activity.layoutInflater, this, true)
+        binding = ViewTileBinding.inflate(activity.layoutInflater, this, true)
 
         // in a more state-of-the-art implementation, typeface could be specifed in XML
         binding.title.typeface = MainApplication.fontKarlaRegular
     }
 
-    fun configure(index: Int, serverItem: Lab49ServerItem, listener: CameraItemListener) {
+    fun configure(index: Int, serverItem: Lab49ServerItem, listener: TileListener) {
 
         this.index = index
         this.listener = listener

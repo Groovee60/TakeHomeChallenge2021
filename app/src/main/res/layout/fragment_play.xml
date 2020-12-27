@@ -63,7 +63,7 @@
         android:orientation="vertical"
         app:layout_constraintGuide_percent=".91" />
 
-    <com.groodysoft.lab49challenge.ItemTileView
+    <com.groodysoft.lab49challenge.TileView
         android:id="@+id/tileA"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -72,7 +72,7 @@
         app:layout_constraintTop_toBottomOf="@id/title"
         app:layout_constraintDimensionRatio="@dimen/tile_aspect_ratio" />
 
-    <com.groodysoft.lab49challenge.ItemTileView
+    <com.groodysoft.lab49challenge.TileView
         android:id="@+id/tileB"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -92,7 +92,7 @@
         app:layout_constraintEnd_toStartOf="@id/guidelineVertCenter2"
         app:layout_constraintDimensionRatio="1:1" />
 
-    <com.groodysoft.lab49challenge.ItemTileView
+    <com.groodysoft.lab49challenge.TileView
         android:id="@+id/tileC"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -101,7 +101,7 @@
         app:layout_constraintTop_toBottomOf="@id/tileSpacer"
         app:layout_constraintDimensionRatio="@dimen/tile_aspect_ratio" />
 
-    <com.groodysoft.lab49challenge.ItemTileView
+    <com.groodysoft.lab49challenge.TileView
         android:id="@+id/tileD"
         android:layout_width="0dp"
         android:layout_height="0dp"

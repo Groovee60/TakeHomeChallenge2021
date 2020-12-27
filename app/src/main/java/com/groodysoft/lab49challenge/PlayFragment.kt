@@ -46,7 +46,7 @@ import kotlin.math.min
 // Camera permissions are enforced in MainActivity before we can get to this fragment
 // App does not currently support permissions being maliciously denied after that point
 
-class PlayFragment: Fragment(), CameraItemListener {
+class PlayFragment: Fragment(), TileListener {
 
     companion object {
         private const val ONE_SECOND_MS = 1000L
@@ -60,7 +60,7 @@ class PlayFragment: Fragment(), CameraItemListener {
 
     private lateinit var binding: FragmentPlayBinding
 
-    private val tiles = mutableListOf<ItemTileView>()
+    private val tiles = mutableListOf<TileView>()
     private var currentTileIndex = -1
 
     private var gameIsStarted = false
@@ -180,7 +180,7 @@ class PlayFragment: Fragment(), CameraItemListener {
         builder.show()
     }
 
-    private val Int.tileAtIndex: ItemTileView?
+    private val Int.tileAtIndex: TileView?
         get() {
             return when (this) {
                 0 -> binding.tileA
