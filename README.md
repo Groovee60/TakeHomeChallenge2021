@@ -37,3 +37,6 @@ Things I might do if spending more time on the app:
 
 - integrate the support library and utilize the new font embedding available with API 26+. Then the Karla typeface
 could be specified in XML instead of in the UI code.
+
+- add a mechanism for reporting (and retrying) internet connectivity issues - as it, there is coroutine exception
+handler that simply reports all errors as fatal alert dialogs
