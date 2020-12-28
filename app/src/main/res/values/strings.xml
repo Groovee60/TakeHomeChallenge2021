@@ -15,6 +15,7 @@
     <string name="error_no_camera_app">No camera application was found on this device.</string>
     <string name="error_saving_image">Error saving image.</string>
     <string name="error_starting_camera">Error starting camera.</string>
+    <string name="error_temp_photo">Error accessing file system for temp photo.</string>
     <string name="error_taking_photo">Error taking photo.</string>
     <string name="error_no_camera_permisisons">Camera permissions were not granted.</string>
 </resources>

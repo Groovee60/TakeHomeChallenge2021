@@ -2,15 +2,12 @@ package com.groodysoft.lab49challenge
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.Environment
 import android.provider.MediaStore
-import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -34,14 +31,11 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.internal.format
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.lang.reflect.Type
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.math.max
-import kotlin.math.min
 
 // Camera permissions are enforced in MainActivity before we can get to this fragment
 // App does not currently support permissions being maliciously denied after that point
@@ -53,6 +47,7 @@ class PlayFragment: Fragment(), TileListener {
         private const val GAME_DURATION_MS = 120 * ONE_SECOND_MS
         private const val REQUEST_IMAGE_CAPTURE = 1
 
+        // flip this flag to switch between two supported camera paths
         private const val USE_CAMERAX = true
     }
 
@@ -60,17 +55,18 @@ class PlayFragment: Fragment(), TileListener {
 
     private lateinit var binding: FragmentPlayBinding
 
-    private val tiles = mutableListOf<TileView>()
-    private var currentTileIndex = -1
+    private lateinit var currentTile: TileView
 
     private var gameIsStarted = false
     private var gameIsOver = false
 
     private var imageCapture: ImageCapture? = null
-    lateinit var capturedRawImagePath: String
 
-    private lateinit var outputDirectory: File
-    private lateinit var cameraExecutor: ExecutorService
+    private lateinit var cameraXExecutor: ExecutorService
+
+    private var tempPhotoDir: File? = null
+    private lateinit var tempPhotoFile: File
+    private lateinit var tempPhotoUri: Uri
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +98,14 @@ class PlayFragment: Fragment(), TileListener {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        outputDirectory = getOutputDirectory()
+        try {
+            // we just use one temp file for all captures, and delete any temp files in onDestroy()
+            tempPhotoDir = requireActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+            tempPhotoFile = File.createTempFile("temp_", ".jpg", tempPhotoDir)
+            tempPhotoUri = FileProvider.getUriForFile(requireContext(), "com.groodysoft.lab49challenge.file.provider", tempPhotoFile)
+        } catch (e: Exception) {
+            requireActivity().showFatalAlert(R.string.error_temp_photo)
+        }
 
         // in a more state-of-the-art implementation, typeface could be specifed in XML
         binding.title.typeface = MainApplication.fontKarlaBold
@@ -112,47 +115,53 @@ class PlayFragment: Fragment(), TileListener {
         val listType: Type = object : TypeToken<List<Lab49ServerItem?>?>() {}.type
         val items: List<Lab49ServerItem> = MainApplication.gson.fromJson(args.jsonItemArray, listType)
 
-        // option for 4 discrete tiles instead of the overhead of a recycler view and adapter/viewholder pattern
-        tiles.add(binding.tileA)
-        tiles.add(binding.tileB)
-        tiles.add(binding.tileC)
-        tiles.add(binding.tileD)
+        // opted for 4 discrete tiles instead of the overhead of a recycler view and adapter/viewholder pattern
+        binding.tileA.configureItem(items[0])
+        binding.tileB.configureItem(items[1])
+        binding.tileC.configureItem(items[2])
+        binding.tileD.configureItem(items[3])
 
-        for ((index, tile) in tiles.withIndex()) {
-            tile.configureItem(index, items[index])
-        }
-
-        GlobalScope.launch(Dispatchers.Main) {
-            binding.timer.text = getString(R.string.ready)
-            delay(ONE_SECOND_MS)
-            binding.timer.text = getString(R.string.set)
-            delay(ONE_SECOND_MS)
-            binding.timer.text = getString(R.string.go)
-            delay(500)
-            configureListeners()
-            startGame()
-        }
+        countdownToStart()
 
         binding.shutterButton.setOnClickListener {
             takePhotoWithCameraX()
         }
     }
 
-    private fun configureListeners() {
-        for (tile in tiles) {
-            tile.configureListener(this)
+    private fun countdownToStart() {
+
+        // isAdded checks avoid an exception if the fragment is exited during the delay
+        GlobalScope.launch(Dispatchers.Main) {
+            if (isAdded) binding.timer.text = getString(R.string.ready)
+            delay(ONE_SECOND_MS)
+            if (isAdded) binding.timer.text = getString(R.string.set)
+            delay(ONE_SECOND_MS)
+            if (isAdded) binding.timer.text = getString(R.string.go)
+            delay(500)
+            startGame()
         }
     }
 
     private lateinit var timer: CountDownTimer
     private fun startGame() {
+
+        // configure the tap listeners
+        binding.tileA.configureListener(this)
+        binding.tileB.configureListener(this)
+        binding.tileC.configureListener(this)
+        binding.tileD.configureListener(this)
+
         gameIsStarted = true
         updateTimeDisplay(GAME_DURATION_MS)
         timer = object : CountDownTimer(GAME_DURATION_MS + ONE_SECOND_MS, 100) {
             override fun onTick(millisUntilFinished: Long) {
-                val done = updateTimeDisplay(millisUntilFinished)
-                if (done) {
-                    endGame(false)
+                if (isAdded) {
+                    val done = updateTimeDisplay(millisUntilFinished)
+                    if (done) {
+                        endGame(false)
+                    }
+                } else {
+                    this.cancel()
                 }
             }
             override fun onFinish() {
@@ -185,69 +194,25 @@ class PlayFragment: Fragment(), TileListener {
         builder.show()
     }
 
-    private val Int.tileAtIndex: TileView?
-        get() {
-            return when (this) {
-                0 -> binding.tileA
-                1 -> binding.tileB
-                2 -> binding.tileC
-                3 -> binding.tileD
-                else -> null
-            }
-        }
-
-    override fun onTapped(index: Int) {
+    override fun onTapped(tile: TileView) {
 
         if (gameIsStarted && !gameIsOver) {
-            index.tileAtIndex?.let { tile ->
-                currentTileIndex = index
-                if (!tile.isMatched) {
 
-                    if (USE_CAMERAX) {
-                        showCameraX()
-                    } else {
-                        dispatchTakePictureIntent()
-                    }
+            currentTile = tile
+            if (!tile.isMatched) {
+
+                if (USE_CAMERAX) {
+                    showCameraX()
+                } else {
+                    dispatchTakePictureIntent()
                 }
             }
         }
     }
 
-    override fun onResultChanged(index: Int) {
-
-        val successCt = tiles.filter { it.isMatched }.size
-        if (successCt == 4) {
+    override fun onResultChanged(tile: TileView) {
+        if (binding.tileA.isMatched && binding.tileB.isMatched && binding.tileC.isMatched && binding.tileD.isMatched) {
             endGame(true)
-        }
-    }
-
-    private fun handleFinalBitmap(bitmap: Bitmap) {
-
-        currentTileIndex.tileAtIndex?.let { tile ->
-
-            // display bitmap in verifying state
-            tile.setCapturedImage(bitmap)
-            tile.setResultState(TileResultState.VERIFY)
-
-            // encode image
-            val byteArrayOutputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
-            val byteArray = byteArrayOutputStream.toByteArray()
-            val base64Encoding = Base64.encodeToString(byteArray, Base64.DEFAULT)
-
-            // send image to server
-            val payload = ImagePayload(tile.item.name, base64Encoding)
-            GlobalScope.launch(Dispatchers.IO + requireActivity().exceptionHandler) {
-
-                // get phony image match result
-                val result = Lab49Repository.postItem(payload)
-                tile.setResultState(
-                    when (result.matched) {
-                        true -> TileResultState.SUCCESS
-                        false -> TileResultState.INCORRECT
-                    }
-                )
-            }
         }
     }
 
@@ -292,11 +257,8 @@ class PlayFragment: Fragment(), TileListener {
         binding.viewFinder.isVisible = true
         val imageCapture = imageCapture ?: return
 
-        // Create time-stamped output file to hold the image
-        val photoFile = File(outputDirectory, "temp.jpg")
-
         // Create output options object which contains file + metadata
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(tempPhotoFile).build()
 
         // Set up image capture listener, which is triggered after photo has
         // been taken
@@ -310,29 +272,16 @@ class PlayFragment: Fragment(), TileListener {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
 
                 hideCameraX()
-                val savedUri = Uri.fromFile(photoFile)
-                savedUri.path?.let {
-                    capturedRawImagePath = it
-                    processCapturedBitmap()
-                } ?: run {
-                    requireActivity().showFatalAlert(R.string.error_saving_image)
-                }
+                currentTile.processCapturedBitmap(requireActivity(), tempPhotoFile.absolutePath)
             }
         })
-    }
-
-    private fun getOutputDirectory(): File {
-        val mediaDir = requireActivity().externalMediaDirs.firstOrNull()?.let {
-            File(it, resources.getString(R.string.app_name)).apply { mkdirs() } }
-        return if (mediaDir != null && mediaDir.exists())
-            mediaDir else requireActivity().filesDir
     }
 
     private fun showCameraX() {
 
         binding.viewFinder.isVisible = true
         binding.shutterButton.isVisible = true
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        cameraXExecutor = Executors.newSingleThreadExecutor()
         startCameraX()
 
     }
@@ -341,35 +290,24 @@ class PlayFragment: Fragment(), TileListener {
 
         binding.viewFinder.isVisible = false
         binding.shutterButton.isVisible = false
-        cameraExecutor.shutdown()
+        cameraXExecutor.shutdown()
     }
 
     private fun dispatchTakePictureIntent() {
 
-        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         try {
-            takePictureIntent.resolveActivity(requireActivity().packageManager).also {
+            val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            takePictureIntent.resolveActivity(requireActivity().packageManager)
 
-                val photoFile: File? = try {
-                    createImageFile()
-                } catch (ex: IOException) {
-                    requireActivity().showFatalAlert(R.string.error_saving_image)
-                    null
-                }
-                photoFile?.also {
-                    val photoURI: Uri = FileProvider.getUriForFile(
-                            requireContext(),
-                            "com.groodysoft.lab49challenge.file.provider",
-                            it
-                    )
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
-                    startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
-                }
-            }
+            takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempPhotoUri)
+            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
+
         } catch (e: ActivityNotFoundException) {
             requireActivity().showFatalAlert(R.string.error_no_camera_app)
         } catch (e: SecurityException) {
             requireActivity().showFatalAlert(R.string.error_no_camera_permisisons)
+        } catch (ex: IOException) {
+            requireActivity().showFatalAlert(R.string.error_saving_image)
         }
     }
 
@@ -377,40 +315,27 @@ class PlayFragment: Fragment(), TileListener {
         super.onActivityResult(requestCode, resultCode, data)
 
         if (requestCode == REQUEST_IMAGE_CAPTURE) {
-            processCapturedBitmap()
+            currentTile.processCapturedBitmap(requireActivity(), tempPhotoFile.absolutePath)
         }
     }
 
-    @Throws(IOException::class)
-    private fun createImageFile(): File {
-        val storageDir: File? = requireActivity().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        return File.createTempFile("temp_", ".jpg", storageDir).apply {
-            capturedRawImagePath = absolutePath
-        }
+    override fun onDestroy() {
+        super.onDestroy()
+        tempPhotoDir?.deleteTempFiles()
     }
 
-    private fun processCapturedBitmap() {
+    private fun File.deleteTempFiles(): Boolean {
 
-        currentTileIndex.tileAtIndex?.let { tile ->
-
-            BitmapFactory.Options().apply {
-
-                // decode just to get the dimensions
-                inJustDecodeBounds = true
-                BitmapFactory.decodeFile(capturedRawImagePath, this)
-                inJustDecodeBounds = false
-                // reverse the width and height because it's landscape view instead of the portrait we want
-                inSampleSize = max(1, min(outWidth / tile.imageHeight, outHeight / tile.imageWidth))
-
-                // decode to resample
-                BitmapFactory.decodeFile(capturedRawImagePath, this)?.also { resizedBitmap ->
-
-                    // rotate
-                    resizedBitmap.rotate(90f)?.let { rotatedBitmap ->
-                        handleFinalBitmap(rotatedBitmap)
-                    }
+        if (isDirectory) {
+            val files = listFiles()
+            if (files != null) {
+                for (f in files) {
+                    // recursion not necessary
+                    f.delete()
                 }
             }
         }
+        // delete the folder itself
+        return delete()
     }
 }

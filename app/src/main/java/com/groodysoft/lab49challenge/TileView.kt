@@ -3,13 +3,18 @@ package com.groodysoft.lab49challenge
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.AttributeSet
+import android.util.Base64
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isVisible
 import com.groodysoft.lab49challenge.databinding.ViewTileBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import kotlin.math.max
+import kotlin.math.min
 
 enum class TileResultState {
     DEFAULT,
@@ -29,8 +34,8 @@ enum class TileResultState {
 }
 
 interface TileListener {
-    fun onTapped(index: Int)
-    fun onResultChanged(index: Int)
+    fun onTapped(tile: TileView)
+    fun onResultChanged(tile: TileView)
 }
 
 class TileView @JvmOverloads constructor(
@@ -42,9 +47,8 @@ class TileView @JvmOverloads constructor(
 
     private var binding: ViewTileBinding
 
-    lateinit var item: Lab49ServerItem
+    private lateinit var item: Lab49ServerItem
     private lateinit var resultState: TileResultState
-    private var index: Int = -1
 
     private lateinit var listener: TileListener
 
@@ -57,9 +61,8 @@ class TileView @JvmOverloads constructor(
         binding.title.typeface = MainApplication.fontKarlaRegular
     }
 
-    fun configureItem(index: Int, serverItem: Lab49ServerItem) {
+    fun configureItem(serverItem: Lab49ServerItem) {
 
-        this.index = index
         item = serverItem
 
         setResultState(TileResultState.DEFAULT)
@@ -70,15 +73,11 @@ class TileView @JvmOverloads constructor(
 
         this.listener = listener
         setOnClickListener {
-            listener.onTapped(index)
+            listener.onTapped(this)
         }
     }
 
-    fun setCapturedImage(bitmap: Bitmap) {
-        binding.capturedImage.setImageBitmap(bitmap)
-    }
-
-    fun setResultState(state: TileResultState) {
+    private fun setResultState(state: TileResultState) {
 
         resultState = state
         GlobalScope.launch(Dispatchers.Main) {
@@ -94,11 +93,11 @@ class TileView @JvmOverloads constructor(
             binding.shade.isVisible = resultState.needsShade
             binding.tileProgress.isVisible = resultState.needsProgress
 
+            // if the image is successfully or unsucesfully matched - let the caller test the game result
             when (resultState) {
-                TileResultState.SUCCESS, TileResultState.INCORRECT -> listener.onResultChanged(index)
+                TileResultState.SUCCESS, TileResultState.INCORRECT -> listener.onResultChanged(this@TileView)
                 else -> {}
             }
-
         }
     }
 
@@ -107,13 +106,52 @@ class TileView @JvmOverloads constructor(
             return resultState == TileResultState.SUCCESS
         }
 
-    val imageWidth: Int
-        get() {
-            return binding.capturedImage.width
-        }
+    fun processCapturedBitmap(activity: Activity, rawImagePath: String) {
 
-    val imageHeight: Int
-        get() {
-            return binding.capturedImage.height
+        BitmapFactory.Options().apply {
+
+            // decode just to get the dimensions
+            inJustDecodeBounds = true
+            BitmapFactory.decodeFile(rawImagePath, this)
+            inJustDecodeBounds = false
+            // reverse the width and height because it's landscape view instead of the portrait we want
+            inSampleSize = max(1, min(outWidth / binding.capturedImage.height, outHeight / binding.capturedImage.width))
+
+            // decode to resample
+            BitmapFactory.decodeFile(rawImagePath, this)?.also { resizedBitmap ->
+
+                // rotate
+                resizedBitmap.rotate(90f)?.let { rotatedBitmap ->
+                    setBitmapCandidate(activity, rotatedBitmap)
+                }
+            }
         }
+    }
+
+    private fun setBitmapCandidate(activity: Activity, bitmap: Bitmap) {
+
+        // display bitmap in verifying state
+        binding.capturedImage.setImageBitmap(bitmap)
+        setResultState(TileResultState.VERIFY)
+
+        // encode image
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+        val base64Encoding = Base64.encodeToString(byteArray, Base64.DEFAULT)
+
+        // send image to server
+        val payload = ImagePayload(item.name, base64Encoding)
+        GlobalScope.launch(Dispatchers.IO + activity.exceptionHandler) {
+
+            // get phony image match result
+            val result = Lab49Repository.postItem(payload)
+            setResultState(
+                    when (result.matched) {
+                        true -> TileResultState.SUCCESS
+                        false -> TileResultState.INCORRECT
+                    }
+            )
+        }
+    }
 }
